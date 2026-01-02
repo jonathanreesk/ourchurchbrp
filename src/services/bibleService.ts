@@ -18,49 +18,52 @@ async function fetchPassage(reference: string, version: BibleVersion): Promise<s
     const cleanRef = reference.trim();
 
     const searchResponse = await fetch(
-      `https://api.scripture.api.bible/v1/bibles/${versionId}/search?query=${encodeURIComponent(cleanRef)}&limit=1`,
+      `https://api.scripture.api.bible/v1/bibles/${versionId}/search?query=${encodeURIComponent(cleanRef)}`,
       {
         headers: {
           'api-key': BIBLE_API_KEY,
-          'Accept': 'application/json',
         }
       }
     );
 
     if (!searchResponse.ok) {
-      console.error('Search failed:', await searchResponse.text());
+      const errorText = await searchResponse.text();
+      console.error('Search failed:', errorText);
       return `Unable to load ${reference}`;
     }
 
     const searchData = await searchResponse.json();
+    console.log('Search results:', searchData);
 
     if (!searchData.data?.verses || searchData.data.verses.length === 0) {
+      console.error('No verses found for:', cleanRef);
       return `${reference} not found`;
     }
 
     const verseId = searchData.data.verses[0].id;
+    console.log('Found verse ID:', verseId);
 
     const passageResponse = await fetch(
-      `https://api.scripture.api.bible/v1/bibles/${versionId}/passages/${verseId}?content-type=text&include-notes=false&include-titles=false&include-chapter-numbers=false&include-verse-numbers=true&include-verse-spans=false`,
+      `https://api.scripture.api.bible/v1/bibles/${versionId}/passages/${verseId}`,
       {
         headers: {
           'api-key': BIBLE_API_KEY,
-          'Accept': 'application/json',
         }
       }
     );
 
     if (!passageResponse.ok) {
-      console.error('Passage fetch failed:', await passageResponse.text());
+      const errorText = await passageResponse.text();
+      console.error('Passage fetch failed:', errorText);
       return `Unable to load ${reference}`;
     }
 
     const passageData = await passageResponse.json();
+    console.log('Passage data:', passageData);
 
     if (passageData.data?.content) {
       const text = passageData.data.content
-        .replace(/\[/g, '')
-        .replace(/\]/g, '')
+        .replace(/<\/?[^>]+(>|$)/g, '')
         .replace(/\s+/g, ' ')
         .trim();
       return text || `${reference} text not available`;
@@ -69,7 +72,7 @@ async function fetchPassage(reference: string, version: BibleVersion): Promise<s
     return `${reference} text not available`;
   } catch (error) {
     console.error('Error fetching passage:', error);
-    return `Error loading ${reference}`;
+    return `Error loading ${reference}: ${error instanceof Error ? error.message : 'Unknown error'}`;
   }
 }
 
