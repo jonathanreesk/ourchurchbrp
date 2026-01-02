@@ -6,9 +6,8 @@ import { fetchReadingPassages } from '../services/bibleService';
 import { VersionSelector } from './VersionSelector';
 
 function getCSTDate() {
-  const now = new Date();
-  const cstDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
-  return cstDate;
+  // Use local timezone to avoid date parsing issues
+  return new Date();
 }
 
 export function ReadingPlan() {
@@ -148,11 +147,17 @@ export function ReadingPlan() {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    const month = date.toLocaleDateString('en-US', { month: 'long' });
+    const day = date.getDate();
+
+    // Add ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
+    const getOrdinalSuffix = (n: number) => {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
+
+    return `${month} ${getOrdinalSuffix(day)}`;
   };
 
   const isToday = currentDate.toDateString() === getCSTDate().toDateString();
@@ -321,9 +326,23 @@ export function ReadingPlan() {
                         <div className="max-w-3xl mx-auto">
                           <div className={`text-slate-700 ${getTextSizeClass()}`}>
                             {passageText.split('\n').map((verse, idx) => {
-                              const match = verse.match(/^(\d+)\s+(.+)$/);
-                              if (match) {
-                                const [, number, text] = match;
+                              // Check for chapter headers
+                              const chapterMatch = verse.match(/^CHAPTER (\d+)$/);
+                              if (chapterMatch) {
+                                const [, chapterNum] = chapterMatch;
+                                return (
+                                  <div key={idx} className="mt-6 mb-3 first:mt-0">
+                                    <h5 className="text-2xl font-bold text-slate-900">
+                                      Chapter {chapterNum}
+                                    </h5>
+                                  </div>
+                                );
+                              }
+
+                              // Check for verse lines
+                              const verseMatch = verse.match(/^(\d+)\s+(.+)$/);
+                              if (verseMatch) {
+                                const [, number, text] = verseMatch;
                                 return (
                                   <span key={idx}>
                                     <sup className="font-bold text-slate-900 mr-1">
