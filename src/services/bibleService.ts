@@ -18,7 +18,7 @@ async function fetchPassage(reference: string, version: BibleVersion): Promise<s
     const cleanRef = reference.trim();
 
     const searchResponse = await fetch(
-      `https://api.scripture.api.bible/v1/bibles/${versionId}/search?query=${encodeURIComponent(cleanRef)}`,
+      `https://rest.api.bible/v1/bibles/${versionId}/search?query=${encodeURIComponent(cleanRef)}`,
       {
         headers: {
           'api-key': BIBLE_API_KEY,
@@ -44,7 +44,7 @@ async function fetchPassage(reference: string, version: BibleVersion): Promise<s
     console.log('Found verse ID:', verseId);
 
     const passageResponse = await fetch(
-      `https://api.scripture.api.bible/v1/bibles/${versionId}/passages/${verseId}`,
+      `https://rest.api.bible/v1/bibles/${versionId}/passages/${verseId}`,
       {
         headers: {
           'api-key': BIBLE_API_KEY,
