@@ -147,7 +147,7 @@ export function ReadingPlan() {
   };
 
   const formatDate = (date: Date) => {
-    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const month = date.toLocaleDateString('en-US', { month: 'long' });
     const day = date.getDate();
 
     // Add ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
