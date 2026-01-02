@@ -1,6 +1,6 @@
 # Our Church BRP
 
-A Bible reading plan application.
+A Bible reading plan application with ESV, NIV, and NLT translations.
 
 ## Setup
 
@@ -10,22 +10,21 @@ A Bible reading plan application.
    npm install
    ```
 
-3. Configure environment variables:
-   - Copy `.env.example` to `.env`:
-     ```bash
-     cp .env.example .env
-     ```
-   - Get a free API key from [Scripture API](https://rest.api.bible)
-   - Update `.env` with your API key:
-     ```
-     VITE_BIBLE_API_KEY=your_actual_api_key_here
-     ```
-
-4. Start the development server:
+3. Start the development server:
    ```bash
    npm run dev
    ```
 
-## Environment Variables
+## Features
 
-- `VITE_BIBLE_API_KEY` - Required for fetching Bible passages from Scripture API
+- Daily Bible reading plan
+- Three translations: ESV, NIV, NLT
+- Track completed readings
+- Calendar navigation
+- Nicely formatted verses with verse numbers
+
+## Bible Translations
+
+The Bible translations (ESV, NIV, NLT) are included as JSON files in `/public/bible/`. These were generated from Bible Gateway using the [bible-translations](https://github.com/jadenzaleski/bible-translations) repository.
+
+**Note:** ESV, NIV, and NLT are copyrighted translations. This repository includes them for personal, non-commercial, educational use only.

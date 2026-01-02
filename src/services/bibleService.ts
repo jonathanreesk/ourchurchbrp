@@ -1,101 +1,128 @@
 import { BibleVersion } from '../types';
 
-const BIBLE_API_KEY = import.meta.env.VITE_BIBLE_API_KEY;
+// Book name mapping for common abbreviations
+const BOOK_MAPPINGS: Record<string, string> = {
+  // Old Testament
+  'Gen': 'Genesis', 'Ex': 'Exodus', 'Exod': 'Exodus', 'Lev': 'Leviticus',
+  'Num': 'Numbers', 'Deut': 'Deuteronomy', 'Josh': 'Joshua', 'Judg': 'Judges',
+  '1 Sam': '1 Samuel', '2 Sam': '2 Samuel', '1 Kgs': '1 Kings', '2 Kgs': '2 Kings',
+  '1 Chr': '1 Chronicles', '2 Chr': '2 Chronicles', 'Neh': 'Nehemiah',
+  'Ps': 'Psalm', 'Prov': 'Proverbs', 'Eccl': 'Ecclesiastes', 'Ecc': 'Ecclesiastes',
+  'Song': 'Song Of Solomon', 'Isa': 'Isaiah', 'Jer': 'Jeremiah', 'Lam': 'Lamentations',
+  'Ezek': 'Ezekiel', 'Dan': 'Daniel', 'Hos': 'Hosea', 'Obad': 'Obadiah',
+  'Jon': 'Jonah', 'Mic': 'Micah', 'Nah': 'Nahum', 'Hab': 'Habakkuk',
+  'Zeph': 'Zephaniah', 'Hag': 'Haggai', 'Zech': 'Zechariah', 'Mal': 'Malachi',
 
-const BIBLE_API_VERSIONS: Record<BibleVersion, string> = {
-  'ESV': 'de4e12af7f28f599-02',
-  'NIV': '78a9f6124f344018-01',
-  'NLT': '7142879509583d59-04'
+  // New Testament
+  'Matt': 'Matthew', 'Mt': 'Matthew', 'Mk': 'Mark', 'Lk': 'Luke', 'Jn': 'John',
+  'Rom': 'Romans', '1 Cor': '1 Corinthians', '2 Cor': '2 Corinthians',
+  'Gal': 'Galatians', 'Eph': 'Ephesians', 'Phil': 'Philippians', 'Col': 'Colossians',
+  '1 Thess': '1 Thessalonians', '2 Thess': '2 Thessalonians',
+  '1 Tim': '1 Timothy', '2 Tim': '2 Timothy', 'Tit': 'Titus', 'Phlm': 'Philemon',
+  'Heb': 'Hebrews', 'Jas': 'James', 'Jam': 'James', '1 Pet': '1 Peter',
+  '2 Pet': '2 Peter', '1 Jn': '1 John', '2 Jn': '2 John', '3 Jn': '3 John',
+  'Rev': 'Revelation'
 };
 
-async function fetchPassage(reference: string, version: BibleVersion): Promise<string> {
-  if (!BIBLE_API_KEY || BIBLE_API_KEY === 'your_api_bible_key_here') {
-    return `📖 ${reference}\n\n[Get your free API key from https://scripture.api.bible to view Bible text]`;
+// Cache for loaded Bible JSON files
+const bibleCache: Record<BibleVersion, any> = {} as Record<BibleVersion, any>;
+
+async function loadBibleVersion(version: BibleVersion): Promise<any> {
+  if (bibleCache[version]) {
+    return bibleCache[version];
   }
 
   try {
-    const versionId = BIBLE_API_VERSIONS[version];
-    const cleanRef = reference.trim();
+    const response = await fetch(`/bible/${version}_bible.json`);
+    if (!response.ok) {
+      throw new Error(`Failed to load ${version} Bible`);
+    }
+    const data = await response.json();
+    bibleCache[version] = data;
+    return data;
+  } catch (error) {
+    console.error(`Error loading ${version} Bible:`, error);
+    throw error;
+  }
+}
 
-    const searchResponse = await fetch(
-      `https://rest.api.bible/v1/bibles/${versionId}/search?query=${encodeURIComponent(cleanRef)}`,
-      {
-        headers: {
-          'api-key': BIBLE_API_KEY,
+function parseReference(reference: string): { book: string; chapter: string; verses?: string } | null {
+  // Clean up the reference
+  const cleaned = reference.trim();
+
+  // Match patterns like "Gen 1", "2 Tim 2", "Ecc 5", "John 3:16", "Gen 1:1-10"
+  const match = cleaned.match(/^([\d\s]*[A-Za-z]+)\s+(\d+)(?::(\d+(?:-\d+)?))?$/);
+
+  if (!match) {
+    console.error('Could not parse reference:', cleaned);
+    return null;
+  }
+
+  let [, bookPart, chapter, verses] = match;
+  bookPart = bookPart.trim();
+
+  // Try to find the full book name
+  let bookName = bookPart;
+
+  // Check if it's an abbreviation
+  if (BOOK_MAPPINGS[bookPart]) {
+    bookName = BOOK_MAPPINGS[bookPart];
+  }
+
+  return { book: bookName, chapter, verses };
+}
+
+async function fetchPassage(reference: string, version: BibleVersion): Promise<string> {
+  try {
+    const bibleData = await loadBibleVersion(version);
+    const parsed = parseReference(reference);
+
+    if (!parsed) {
+      return `Unable to parse reference: ${reference}`;
+    }
+
+    const { book, chapter, verses } = parsed;
+
+    // Check if book exists
+    if (!bibleData[book]) {
+      console.error(`Book not found: ${book}`, 'Available:', Object.keys(bibleData).slice(0, 10));
+      return `Book not found: ${book}`;
+    }
+
+    // Check if chapter exists
+    if (!bibleData[book][chapter]) {
+      return `Chapter ${chapter} not found in ${book}`;
+    }
+
+    const chapterData = bibleData[book][chapter];
+    let formattedText = '';
+
+    if (verses) {
+      // Specific verse or range
+      if (verses.includes('-')) {
+        const [start, end] = verses.split('-').map(Number);
+        for (let v = start; v <= end; v++) {
+          const verseText = chapterData[v.toString()];
+          if (verseText) {
+            formattedText += `${v} ${verseText}\n`;
+          }
+        }
+      } else {
+        // Single verse
+        const verseText = chapterData[verses];
+        if (verseText) {
+          formattedText = `${verses} ${verseText}`;
         }
       }
-    );
-
-    if (!searchResponse.ok) {
-      const errorText = await searchResponse.text();
-      console.error('Search failed:', errorText);
-      return `Unable to load ${reference}`;
-    }
-
-    const searchData = await searchResponse.json();
-    console.log('Search results:', searchData);
-
-    if (!searchData.data?.passages || searchData.data.passages.length === 0) {
-      console.error('No passages found for:', cleanRef);
-      return `${reference} not found`;
-    }
-
-    // The search endpoint already returns the passage content
-    const passage = searchData.data.passages[0];
-    console.log('Found passage:', passage.reference);
-
-    if (passage.content) {
-      // Parse HTML to extract verses with proper formatting
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(passage.content, 'text/html');
-
-      // Find all verse spans
-      const verseElements = doc.querySelectorAll('span[data-number]');
-
-      if (verseElements.length > 0) {
-        let formattedText = '';
-        verseElements.forEach((verseSpan, index) => {
-          const verseNumber = verseSpan.getAttribute('data-number');
-          // Get the text after this verse number until the next verse or end
-          let verseText = '';
-          let node = verseSpan.nextSibling;
-
-          while (node && !(node.nodeType === 1 && node.getAttribute('data-number'))) {
-            if (node.nodeType === 3) { // Text node
-              verseText += node.textContent;
-            } else if (node.nodeType === 1) { // Element node
-              verseText += node.textContent;
-            }
-            node = node.nextSibling;
-            if (!node && verseSpan.parentElement && verseSpan.parentElement.nextElementSibling) {
-              // Move to next paragraph if exists
-              const nextP = verseSpan.parentElement.nextElementSibling;
-              if (nextP.querySelector('span[data-number]')) {
-                break;
-              }
-              node = nextP.firstChild;
-              verseSpan = { parentElement: nextP, nextSibling: node } as any;
-            }
-          }
-
-          verseText = verseText.replace(/\s+/g, ' ').trim();
-          if (verseText) {
-            formattedText += `${verseNumber} ${verseText}\n`;
-          }
-        });
-
-        return formattedText.trim() || `${reference} text not available`;
+    } else {
+      // Whole chapter
+      const verseNumbers = Object.keys(chapterData).sort((a, b) => Number(a) - Number(b));
+      for (const verseNum of verseNumbers) {
+        formattedText += `${verseNum} ${chapterData[verseNum]}\n`;
       }
-
-      // Fallback to simple text extraction if no verse numbers found
-      const text = passage.content
-        .replace(/<\/?[^>]+(>|$)/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      return text || `${reference} text not available`;
     }
 
-    return `${reference} text not available`;
+    return formattedText.trim() || `${reference} not found`;
   } catch (error) {
     console.error('Error fetching passage:', error);
     return `Error loading ${reference}: ${error instanceof Error ? error.message : 'Unknown error'}`;
