@@ -6,8 +6,14 @@ import { fetchReadingPassages } from '../services/bibleService';
 import { VersionSelector } from './VersionSelector';
 import { PassageDisplay } from './PassageDisplay';
 
+function getCSTDate() {
+  const now = new Date();
+  const cstDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+  return cstDate;
+}
+
 export function ReadingPlan() {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(getCSTDate());
   const [reading, setReading] = useState<ReadingPlanType | null>(null);
   const [passages, setPassages] = useState<Array<{ reference: string; text: string }>>([]);
   const [version, setVersion] = useState<BibleVersion>('ESV');
@@ -101,7 +107,7 @@ export function ReadingPlan() {
   }
 
   function goToToday() {
-    setCurrentDate(new Date());
+    setCurrentDate(getCSTDate());
   }
 
   const formatDate = (date: Date) => {
@@ -113,7 +119,7 @@ export function ReadingPlan() {
     });
   };
 
-  const isToday = currentDate.toDateString() === new Date().toDateString();
+  const isToday = currentDate.toDateString() === getCSTDate().toDateString();
 
   if (loading) {
     return (
