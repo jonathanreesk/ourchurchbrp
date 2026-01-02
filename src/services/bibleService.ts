@@ -15,10 +15,10 @@ async function fetchPassage(reference: string, version: BibleVersion): Promise<s
 
   try {
     const versionId = BIBLE_API_VERSIONS[version];
-    const cleanRef = reference.trim().replace(/\s+/g, '%20');
+    const cleanRef = reference.trim();
 
-    const response = await fetch(
-      `https://api.scripture.api.bible/v1/bibles/${versionId}/search?query=${cleanRef}&limit=1`,
+    const searchResponse = await fetch(
+      `https://api.scripture.api.bible/v1/bibles/${versionId}/search?query=${encodeURIComponent(cleanRef)}&limit=1`,
       {
         headers: {
           'api-key': BIBLE_API_KEY,
@@ -27,15 +27,40 @@ async function fetchPassage(reference: string, version: BibleVersion): Promise<s
       }
     );
 
-    if (!response.ok) {
+    if (!searchResponse.ok) {
+      console.error('Search failed:', await searchResponse.text());
       return `Unable to load ${reference}`;
     }
 
-    const data = await response.json();
+    const searchData = await searchResponse.json();
 
-    if (data.data?.passages && data.data.passages.length > 0) {
-      const text = data.data.passages[0].content
-        .replace(/<[^>]*>/g, '')
+    if (!searchData.data?.verses || searchData.data.verses.length === 0) {
+      return `${reference} not found`;
+    }
+
+    const verseId = searchData.data.verses[0].id;
+
+    const passageResponse = await fetch(
+      `https://api.scripture.api.bible/v1/bibles/${versionId}/passages/${verseId}?content-type=text&include-notes=false&include-titles=false&include-chapter-numbers=false&include-verse-numbers=true&include-verse-spans=false`,
+      {
+        headers: {
+          'api-key': BIBLE_API_KEY,
+          'Accept': 'application/json',
+        }
+      }
+    );
+
+    if (!passageResponse.ok) {
+      console.error('Passage fetch failed:', await passageResponse.text());
+      return `Unable to load ${reference}`;
+    }
+
+    const passageData = await passageResponse.json();
+
+    if (passageData.data?.content) {
+      const text = passageData.data.content
+        .replace(/\[/g, '')
+        .replace(/\]/g, '')
         .replace(/\s+/g, ' ')
         .trim();
       return text || `${reference} text not available`;
