@@ -15,7 +15,7 @@ A Bible reading plan application.
      ```bash
      cp .env.example .env
      ```
-   - Get a free API key from [Scripture API](https://scripture.api.bible)
+   - Get a free API key from [Scripture API](https://rest.api.bible)
    - Update `.env` with your API key:
      ```
      VITE_BIBLE_API_KEY=your_actual_api_key_here
