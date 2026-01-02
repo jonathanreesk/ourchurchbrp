@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, BookOpen, Calendar, Check, Sparkles, Type } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen, Calendar, Check, CheckCircle2, Type } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ReadingPlan as ReadingPlanType, BibleVersion } from '../types';
 import { fetchReadingPassages } from '../services/bibleService';
@@ -52,6 +52,7 @@ export function ReadingPlan() {
   async function loadReading(date: Date) {
     setLoading(true);
     const dateStr = date.toISOString().split('T')[0];
+    console.log('Loading reading for date:', dateStr);
 
     const { data, error } = await supabase
       .from('reading_plan')
@@ -62,22 +63,29 @@ export function ReadingPlan() {
     if (error) {
       console.error('Error loading reading:', error);
     } else {
+      console.log('Loaded reading data:', data);
       setReading(data);
     }
 
     setLoading(false);
   }
 
-  async function loadCompletedPassages() {
+  function loadCompletedPassages() {
     if (!reading) return;
 
-    const { data } = await supabase
-      .from('completed_readings')
-      .select('passage')
-      .eq('date', reading.date);
-
-    if (data) {
-      setCompletedPassages(new Set(data.map(d => d.passage)));
+    // Load completed passages from localStorage
+    const key = `completed_${reading.date}`;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      try {
+        const passages = JSON.parse(stored);
+        setCompletedPassages(new Set(passages));
+      } catch (error) {
+        console.error('Error loading completed passages from localStorage:', error);
+        setCompletedPassages(new Set());
+      }
+    } else {
+      setCompletedPassages(new Set());
     }
   }
 
@@ -95,15 +103,14 @@ export function ReadingPlan() {
 
     setLoadingPassage(false);
 
-    // Mark as completed if first time clicking
+    // Mark as completed in localStorage
     if (!completedPassages.has(passage)) {
-      const { error } = await supabase
-        .from('completed_readings')
-        .insert({ date: reading.date, passage });
+      const updated = new Set([...completedPassages, passage]);
+      setCompletedPassages(updated);
 
-      if (!error) {
-        setCompletedPassages(prev => new Set([...prev, passage]));
-      }
+      // Save to localStorage
+      const key = `completed_${reading.date}`;
+      localStorage.setItem(key, JSON.stringify([...updated]));
     }
   }
 
@@ -291,19 +298,21 @@ export function ReadingPlan() {
                       <button
                         key={index}
                         onClick={() => handlePassageClick(trimmedPassage)}
-                        className={`text-left px-5 py-4 rounded-xl border-2 transition-all flex items-center gap-2 group ${
+                        className={`text-left px-5 py-4 rounded-xl border-2 transition-all flex items-center gap-3 group ${
                           isSelected
-                            ? 'border-slate-900 bg-slate-50 shadow-md'
-                            : 'border-slate-200 hover:border-slate-400 hover:bg-slate-50'
+                            ? 'border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-200'
+                            : isCompleted
+                              ? 'border-green-300 hover:border-green-400 hover:bg-green-50'
+                              : 'border-slate-200 hover:border-slate-400 hover:bg-slate-50'
                         }`}
                       >
                         <span className={`text-lg font-semibold whitespace-nowrap ${
-                          isSelected ? 'text-slate-900' : 'text-slate-700 group-hover:text-slate-900'
+                          isSelected ? 'text-blue-900' : isCompleted ? 'text-green-900' : 'text-slate-700 group-hover:text-slate-900'
                         }`}>
                           {trimmedPassage}
                         </span>
                         {isCompleted && (
-                          <Sparkles className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                          <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
                         )}
                       </button>
                     );
