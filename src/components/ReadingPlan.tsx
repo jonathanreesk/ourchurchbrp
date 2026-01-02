@@ -6,9 +6,8 @@ import { fetchReadingPassages } from '../services/bibleService';
 import { VersionSelector } from './VersionSelector';
 
 function getCSTDate() {
-  const now = new Date();
-  const cstDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
-  return cstDate;
+  // Use local timezone to avoid date parsing issues
+  return new Date();
 }
 
 export function ReadingPlan() {
@@ -148,11 +147,17 @@ export function ReadingPlan() {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const day = date.getDate();
+
+    // Add ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
+    const getOrdinalSuffix = (n: number) => {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
+
+    return `${month} ${getOrdinalSuffix(day)}`;
   };
 
   const isToday = currentDate.toDateString() === getCSTDate().toDateString();
