@@ -20,6 +20,7 @@ export function ReadingPlan() {
   const [loading, setLoading] = useState(true);
   const [loadingPassage, setLoadingPassage] = useState(false);
   const [completedPassages, setCompletedPassages] = useState<Set<string>>(new Set());
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     loadReading(currentDate);
@@ -101,9 +102,18 @@ export function ReadingPlan() {
     setCurrentDate(getCSTDate());
   }
 
+  function handleDateSelect(dateString: string) {
+    const selectedDate = new Date(dateString + 'T00:00:00');
+    setCurrentDate(selectedDate);
+    setShowDatePicker(false);
+  }
+
+  const getDayOfWeek = (date: Date) => {
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+  };
+
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
-      weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -146,19 +156,33 @@ export function ReadingPlan() {
 
               <div className="text-center flex-1">
                 <div className="flex items-center justify-center gap-2 mb-2">
-                  <Calendar className="w-5 h-5" />
+                  <button
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className="p-1 hover:bg-white/10 rounded transition-colors"
+                    aria-label="Select date"
+                  >
+                    <Calendar className="w-5 h-5" />
+                  </button>
                   <span className="text-sm font-medium uppercase tracking-wide">
-                    {reading?.day_of_week === 'M' && 'Monday'}
-                    {reading?.day_of_week === 'T' && 'Tuesday'}
-                    {reading?.day_of_week === 'W' && 'Wednesday'}
-                    {reading?.day_of_week === 'Th' && 'Thursday'}
-                    {reading?.day_of_week === 'F' && 'Friday'}
-                    {reading?.day_of_week === 'S' && 'Saturday'}
+                    {getDayOfWeek(currentDate)}
                   </span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold">
                   {formatDate(currentDate)}
                 </h2>
+
+                {showDatePicker && (
+                  <div className="mt-4 inline-block">
+                    <input
+                      type="date"
+                      value={currentDate.toISOString().split('T')[0]}
+                      onChange={(e) => handleDateSelect(e.target.value)}
+                      className="px-4 py-2 rounded-lg text-slate-900 font-medium"
+                      max="2026-12-31"
+                      min="2026-01-01"
+                    />
+                  </div>
+                )}
               </div>
 
               <button
