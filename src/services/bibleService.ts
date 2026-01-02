@@ -35,34 +35,17 @@ async function fetchPassage(reference: string, version: BibleVersion): Promise<s
     const searchData = await searchResponse.json();
     console.log('Search results:', searchData);
 
-    if (!searchData.data?.verses || searchData.data.verses.length === 0) {
-      console.error('No verses found for:', cleanRef);
+    if (!searchData.data?.passages || searchData.data.passages.length === 0) {
+      console.error('No passages found for:', cleanRef);
       return `${reference} not found`;
     }
 
-    const verseId = searchData.data.verses[0].id;
-    console.log('Found verse ID:', verseId);
+    // The search endpoint already returns the passage content
+    const passage = searchData.data.passages[0];
+    console.log('Found passage:', passage.reference);
 
-    const passageResponse = await fetch(
-      `https://rest.api.bible/v1/bibles/${versionId}/passages/${verseId}`,
-      {
-        headers: {
-          'api-key': BIBLE_API_KEY,
-        }
-      }
-    );
-
-    if (!passageResponse.ok) {
-      const errorText = await passageResponse.text();
-      console.error('Passage fetch failed:', errorText);
-      return `Unable to load ${reference}`;
-    }
-
-    const passageData = await passageResponse.json();
-    console.log('Passage data:', passageData);
-
-    if (passageData.data?.content) {
-      const text = passageData.data.content
+    if (passage.content) {
+      const text = passage.content
         .replace(/<\/?[^>]+(>|$)/g, '')
         .replace(/\s+/g, ' ')
         .trim();
