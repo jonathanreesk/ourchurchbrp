@@ -153,6 +153,38 @@ export function ReadingPlan() {
     return date.toLocaleDateString('en-US', { weekday: 'long' });
   };
 
+  const expandBookName = (reference: string): string => {
+    // Book name mapping for abbreviations
+    const bookMappings: Record<string, string> = {
+      'Gen': 'Genesis', 'Ex': 'Exodus', 'Exod': 'Exodus', 'Lev': 'Leviticus',
+      'Num': 'Numbers', 'Deut': 'Deuteronomy', 'Josh': 'Joshua', 'Judg': 'Judges',
+      '1 Sam': '1 Samuel', '2 Sam': '2 Samuel', '1 Kgs': '1 Kings', '2 Kgs': '2 Kings',
+      '1 Chr': '1 Chronicles', '2 Chr': '2 Chronicles', 'Neh': 'Nehemiah',
+      'Ps': 'Psalm', 'Prov': 'Proverbs', 'Eccl': 'Ecclesiastes', 'Ecc': 'Ecclesiastes',
+      'Song': 'Song of Solomon', 'Isa': 'Isaiah', 'Jer': 'Jeremiah', 'Lam': 'Lamentations',
+      'Ezek': 'Ezekiel', 'Ez': 'Ezekiel', 'Dan': 'Daniel', 'Hos': 'Hosea', 'Obad': 'Obadiah',
+      'Jon': 'Jonah', 'Mic': 'Micah', 'Nah': 'Nahum', 'Hab': 'Habakkuk',
+      'Zeph': 'Zephaniah', 'Hag': 'Haggai', 'Zech': 'Zechariah', 'Zec': 'Zechariah', 'Mal': 'Malachi',
+      'Matt': 'Matthew', 'Mt': 'Matthew', 'Mk': 'Mark', 'Lk': 'Luke', 'Jn': 'John',
+      'Rom': 'Romans', '1 Cor': '1 Corinthians', '2 Cor': '2 Corinthians',
+      'Gal': 'Galatians', 'Eph': 'Ephesians', 'Phil': 'Philippians', 'Col': 'Colossians',
+      '1 Thess': '1 Thessalonians', '2 Thess': '2 Thessalonians',
+      '1 Tim': '1 Timothy', '2 Tim': '2 Timothy', 'Tit': 'Titus', 'Phlm': 'Philemon',
+      'Heb': 'Hebrews', 'Jas': 'James', 'Jam': 'James', '1 Pet': '1 Peter',
+      '2 Pet': '2 Peter', '1 Jn': '1 John', '2 Jn': '2 John', '3 Jn': '3 John',
+      'Rev': 'Revelation'
+    };
+
+    // Try to match the book abbreviation at the start of the reference
+    for (const [abbrev, fullName] of Object.entries(bookMappings)) {
+      if (reference.startsWith(abbrev + ' ')) {
+        return reference.replace(abbrev, fullName);
+      }
+    }
+
+    return reference;
+  };
+
   const formatDate = (date: Date) => {
     const month = date.toLocaleDateString('en-US', { month: 'long' });
     const day = date.getDate();
@@ -182,16 +214,16 @@ export function ReadingPlan() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
-        <header className="text-center mb-8">
-          <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-2">
+      <div className="max-w-4xl mx-auto px-2 sm:px-4 py-6 sm:py-12">
+        <header className="text-center mb-6 sm:mb-8">
+          <h1 className="text-3xl sm:text-5xl font-bold text-slate-900 mb-2">
             Daily Bible Reading
           </h1>
           <p className="text-slate-600">2026 Reading Plan</p>
         </header>
 
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-6">
-          <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-8 text-white">
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden mb-4 sm:mb-6">
+          <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-3 sm:px-6 py-6 sm:py-8 text-white">
             <div className="flex items-center justify-between mb-4">
               <button
                 onClick={() => navigateDay(-1)}
@@ -253,10 +285,10 @@ export function ReadingPlan() {
             )}
           </div>
 
-          <div className="p-6 sm:p-8">
+          <div className="p-3 sm:p-8">
             {reading ? (
               <>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
                   <h3 className="text-lg font-semibold text-slate-900">
                     Today's Reading
                   </h3>
@@ -328,11 +360,11 @@ export function ReadingPlan() {
                         <div className="h-4 bg-slate-100 rounded w-5/6"></div>
                       </div>
                     ) : (
-                      <div className="bg-slate-50 rounded-xl p-6">
-                        <h4 className="text-xl font-bold text-slate-900 mb-4 text-center">
-                          {selectedPassage}
+                      <div className="bg-slate-50 rounded-xl p-4 sm:p-6">
+                        <h4 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 text-center">
+                          {expandBookName(selectedPassage)}
                         </h4>
-                        <div className="max-w-3xl mx-auto">
+                        <div className="mx-auto">
                           <div className={`text-slate-700 ${getTextSizeClass()}`}>
                             {passageText.split('\n').map((verse, idx) => {
                               // Check for chapter headers
@@ -383,12 +415,12 @@ export function ReadingPlan() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden p-6 sm:p-8">
-          <h3 className="text-2xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <BookOpen className="w-6 h-6 text-slate-700" />
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden p-3 sm:p-8">
+          <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3 sm:mb-4 flex items-center gap-2">
+            <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-slate-700" />
             Helpful Resources
           </h3>
-          <p className="text-slate-600 text-center py-8">
+          <p className="text-slate-600 text-center py-6 sm:py-8">
             Resource videos coming soon...
           </p>
         </div>
