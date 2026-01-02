@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, BookOpen, Calendar, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen, Calendar, Check, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ReadingPlan as ReadingPlanType, BibleVersion } from '../types';
 import { fetchReadingPassages } from '../services/bibleService';
 import { VersionSelector } from './VersionSelector';
-import { PassageDisplay } from './PassageDisplay';
 
 function getCSTDate() {
   const now = new Date();
@@ -15,12 +14,12 @@ function getCSTDate() {
 export function ReadingPlan() {
   const [currentDate, setCurrentDate] = useState(getCSTDate());
   const [reading, setReading] = useState<ReadingPlanType | null>(null);
-  const [passages, setPassages] = useState<Array<{ reference: string; text: string }>>([]);
+  const [selectedPassage, setSelectedPassage] = useState<string | null>(null);
+  const [passageText, setPassageText] = useState<string>('');
   const [version, setVersion] = useState<BibleVersion>('ESV');
   const [loading, setLoading] = useState(true);
-  const [loadingPassages, setLoadingPassages] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [completionLoading, setCompletionLoading] = useState(false);
+  const [loadingPassage, setLoadingPassage] = useState(false);
+  const [completedPassages, setCompletedPassages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadReading(currentDate);
@@ -28,10 +27,11 @@ export function ReadingPlan() {
 
   useEffect(() => {
     if (reading) {
-      loadPassages();
-      checkCompletion();
+      loadCompletedPassages();
+      setSelectedPassage(null);
+      setPassageText('');
     }
-  }, [reading, version]);
+  }, [reading]);
 
   async function loadReading(date: Date) {
     setLoading(true);
@@ -52,52 +52,43 @@ export function ReadingPlan() {
     setLoading(false);
   }
 
-  async function loadPassages() {
-    if (!reading) return;
-
-    setLoadingPassages(true);
-    const results = await fetchReadingPassages(reading.reading, version);
-    setPassages(results);
-    setLoadingPassages(false);
-  }
-
-  async function checkCompletion() {
+  async function loadCompletedPassages() {
     if (!reading) return;
 
     const { data } = await supabase
       .from('completed_readings')
-      .select('*')
-      .eq('date', reading.date)
-      .maybeSingle();
+      .select('passage')
+      .eq('date', reading.date);
 
-    setIsCompleted(!!data);
+    if (data) {
+      setCompletedPassages(new Set(data.map(d => d.passage)));
+    }
   }
 
-  async function toggleCompletion() {
+  async function handlePassageClick(passage: string) {
     if (!reading) return;
 
-    setCompletionLoading(true);
+    // Load the passage text
+    setSelectedPassage(passage);
+    setLoadingPassage(true);
 
-    if (isCompleted) {
-      const { error } = await supabase
-        .from('completed_readings')
-        .delete()
-        .eq('date', reading.date);
-
-      if (!error) {
-        setIsCompleted(false);
-      }
-    } else {
-      const { error } = await supabase
-        .from('completed_readings')
-        .insert({ date: reading.date });
-
-      if (!error) {
-        setIsCompleted(true);
-      }
+    const results = await fetchReadingPassages(passage, version);
+    if (results.length > 0) {
+      setPassageText(results[0].text);
     }
 
-    setCompletionLoading(false);
+    setLoadingPassage(false);
+
+    // Mark as completed if first time clicking
+    if (!completedPassages.has(passage)) {
+      const { error } = await supabase
+        .from('completed_readings')
+        .insert({ date: reading.date, passage });
+
+      if (!error) {
+        setCompletedPassages(prev => new Set([...prev, passage]));
+      }
+    }
   }
 
   function navigateDay(offset: number) {
@@ -194,40 +185,67 @@ export function ReadingPlan() {
           <div className="p-6 sm:p-8">
             {reading ? (
               <>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-6 border-b border-slate-200">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900 mb-1">
-                      Today's Reading
-                    </h3>
-                    <p className="text-2xl font-bold text-slate-700">
-                      {reading.reading}
-                    </p>
-                  </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    Today's Reading
+                  </h3>
                   <VersionSelector
                     version={version}
                     onChange={setVersion}
                   />
                 </div>
 
-                <PassageDisplay
-                  passages={passages}
-                  loading={loadingPassages}
-                />
+                <div className="space-y-3 mb-8">
+                  {reading.reading.split(';').map((passage, index) => {
+                    const trimmedPassage = passage.trim();
+                    const isCompleted = completedPassages.has(trimmedPassage);
+                    const isSelected = selectedPassage === trimmedPassage;
 
-                <div className="mt-8 pt-6 border-t border-slate-200 flex justify-center">
-                  <button
-                    onClick={toggleCompletion}
-                    disabled={completionLoading}
-                    className={`px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                      isCompleted
-                        ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg'
-                        : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    <Check className={`w-5 h-5 ${isCompleted ? 'animate-pulse' : ''}`} />
-                    {isCompleted ? 'Completed' : 'Mark as Complete'}
-                  </button>
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => handlePassageClick(trimmedPassage)}
+                        className={`w-full text-left px-5 py-4 rounded-xl border-2 transition-all flex items-center justify-between group ${
+                          isSelected
+                            ? 'border-slate-900 bg-slate-50 shadow-md'
+                            : 'border-slate-200 hover:border-slate-400 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className={`text-lg font-semibold ${
+                          isSelected ? 'text-slate-900' : 'text-slate-700 group-hover:text-slate-900'
+                        }`}>
+                          {trimmedPassage}
+                        </span>
+                        {isCompleted && (
+                          <Sparkles className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
+
+                {selectedPassage && (
+                  <div className="border-t border-slate-200 pt-6">
+                    {loadingPassage ? (
+                      <div className="animate-pulse space-y-3">
+                        <div className="h-4 bg-slate-100 rounded w-full"></div>
+                        <div className="h-4 bg-slate-100 rounded w-full"></div>
+                        <div className="h-4 bg-slate-100 rounded w-5/6"></div>
+                      </div>
+                    ) : (
+                      <div className="border-l-4 border-slate-300 pl-4">
+                        <h4 className="text-lg font-bold text-slate-900 mb-3">
+                          {selectedPassage}
+                        </h4>
+                        <div className="prose prose-slate max-w-none">
+                          <p className="text-slate-700 leading-relaxed whitespace-pre-line">
+                            {passageText}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <div className="text-center py-12">
