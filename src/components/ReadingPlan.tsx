@@ -219,7 +219,7 @@ export function ReadingPlan() {
                   />
                 </div>
 
-                <div className="space-y-3 mb-8">
+                <div className="flex flex-wrap gap-3 mb-8">
                   {reading.reading.split(';').map((passage, index) => {
                     const trimmedPassage = passage.trim();
                     const isCompleted = completedPassages.has(trimmedPassage);
@@ -229,13 +229,13 @@ export function ReadingPlan() {
                       <button
                         key={index}
                         onClick={() => handlePassageClick(trimmedPassage)}
-                        className={`w-full text-left px-5 py-4 rounded-xl border-2 transition-all flex items-center justify-between group ${
+                        className={`text-left px-5 py-4 rounded-xl border-2 transition-all flex items-center gap-2 group ${
                           isSelected
                             ? 'border-slate-900 bg-slate-50 shadow-md'
                             : 'border-slate-200 hover:border-slate-400 hover:bg-slate-50'
                         }`}
                       >
-                        <span className={`text-lg font-semibold ${
+                        <span className={`text-lg font-semibold whitespace-nowrap ${
                           isSelected ? 'text-slate-900' : 'text-slate-700 group-hover:text-slate-900'
                         }`}>
                           {trimmedPassage}
