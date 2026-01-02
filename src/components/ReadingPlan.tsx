@@ -34,6 +34,21 @@ export function ReadingPlan() {
     }
   }, [reading]);
 
+  useEffect(() => {
+    // Re-fetch passage when version changes
+    if (selectedPassage) {
+      const refetchPassage = async () => {
+        setLoadingPassage(true);
+        const results = await fetchReadingPassages(selectedPassage, version);
+        if (results.length > 0) {
+          setPassageText(results[0].text);
+        }
+        setLoadingPassage(false);
+      };
+      refetchPassage();
+    }
+  }, [version]);
+
   async function loadReading(date: Date) {
     setLoading(true);
     const dateStr = date.toISOString().split('T')[0];
@@ -257,14 +272,28 @@ export function ReadingPlan() {
                         <div className="h-4 bg-slate-100 rounded w-5/6"></div>
                       </div>
                     ) : (
-                      <div className="border-l-4 border-slate-300 pl-4">
-                        <h4 className="text-lg font-bold text-slate-900 mb-3">
+                      <div className="bg-slate-50 rounded-xl p-6">
+                        <h4 className="text-xl font-bold text-slate-900 mb-4 text-center">
                           {selectedPassage}
                         </h4>
-                        <div className="prose prose-slate max-w-none">
-                          <p className="text-slate-700 leading-relaxed whitespace-pre-line">
-                            {passageText}
-                          </p>
+                        <div className="max-w-3xl mx-auto">
+                          <div className="text-slate-700 leading-relaxed space-y-2">
+                            {passageText.split('\n').map((verse, idx) => {
+                              const match = verse.match(/^(\d+)\s+(.+)$/);
+                              if (match) {
+                                const [, number, text] = match;
+                                return (
+                                  <p key={idx} className="flex gap-3">
+                                    <span className="font-bold text-slate-900 min-w-[2rem] flex-shrink-0">
+                                      {number}
+                                    </span>
+                                    <span className="flex-1">{text}</span>
+                                  </p>
+                                );
+                              }
+                              return verse ? <p key={idx}>{verse}</p> : null;
+                            })}
+                          </div>
                         </div>
                       </div>
                     )}

@@ -45,6 +45,49 @@ async function fetchPassage(reference: string, version: BibleVersion): Promise<s
     console.log('Found passage:', passage.reference);
 
     if (passage.content) {
+      // Parse HTML to extract verses with proper formatting
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(passage.content, 'text/html');
+
+      // Find all verse spans
+      const verseElements = doc.querySelectorAll('span[data-number]');
+
+      if (verseElements.length > 0) {
+        let formattedText = '';
+        verseElements.forEach((verseSpan, index) => {
+          const verseNumber = verseSpan.getAttribute('data-number');
+          // Get the text after this verse number until the next verse or end
+          let verseText = '';
+          let node = verseSpan.nextSibling;
+
+          while (node && !(node.nodeType === 1 && node.getAttribute('data-number'))) {
+            if (node.nodeType === 3) { // Text node
+              verseText += node.textContent;
+            } else if (node.nodeType === 1) { // Element node
+              verseText += node.textContent;
+            }
+            node = node.nextSibling;
+            if (!node && verseSpan.parentElement && verseSpan.parentElement.nextElementSibling) {
+              // Move to next paragraph if exists
+              const nextP = verseSpan.parentElement.nextElementSibling;
+              if (nextP.querySelector('span[data-number]')) {
+                break;
+              }
+              node = nextP.firstChild;
+              verseSpan = { parentElement: nextP, nextSibling: node } as any;
+            }
+          }
+
+          verseText = verseText.replace(/\s+/g, ' ').trim();
+          if (verseText) {
+            formattedText += `${verseNumber} ${verseText}\n`;
+          }
+        });
+
+        return formattedText.trim() || `${reference} text not available`;
+      }
+
+      // Fallback to simple text extraction if no verse numbers found
       const text = passage.content
         .replace(/<\/?[^>]+(>|$)/g, '')
         .replace(/\s+/g, ' ')
