@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, BookOpen, Calendar, Check, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen, Calendar, Check, Sparkles, Type } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ReadingPlan as ReadingPlanType, BibleVersion } from '../types';
 import { fetchReadingPassages } from '../services/bibleService';
@@ -21,6 +21,7 @@ export function ReadingPlan() {
   const [loadingPassage, setLoadingPassage] = useState(false);
   const [completedPassages, setCompletedPassages] = useState<Set<string>>(new Set());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [textSize, setTextSize] = useState<'small' | 'medium' | 'large'>('medium');
 
   useEffect(() => {
     loadReading(currentDate);
@@ -122,6 +123,25 @@ export function ReadingPlan() {
     setCurrentDate(selectedDate);
     setShowDatePicker(false);
   }
+
+  function increaseTextSize() {
+    if (textSize === 'small') setTextSize('medium');
+    else if (textSize === 'medium') setTextSize('large');
+  }
+
+  function decreaseTextSize() {
+    if (textSize === 'large') setTextSize('medium');
+    else if (textSize === 'medium') setTextSize('small');
+  }
+
+  const getTextSizeClass = () => {
+    switch (textSize) {
+      case 'small': return 'text-base leading-relaxed';
+      case 'medium': return 'text-lg leading-relaxed';
+      case 'large': return 'text-xl leading-relaxed';
+      default: return 'text-lg leading-relaxed';
+    }
+  };
 
   const getDayOfWeek = (date: Date) => {
     return date.toLocaleDateString('en-US', { weekday: 'long' });
@@ -228,10 +248,32 @@ export function ReadingPlan() {
                   <h3 className="text-lg font-semibold text-slate-900">
                     Today's Reading
                   </h3>
-                  <VersionSelector
-                    version={version}
-                    onChange={setVersion}
-                  />
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 border border-slate-300 rounded-lg p-1">
+                      <button
+                        onClick={decreaseTextSize}
+                        disabled={textSize === 'small'}
+                        className="p-2 hover:bg-slate-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        aria-label="Decrease text size"
+                        title="Smaller text"
+                      >
+                        <Type className="w-4 h-4 text-slate-700" />
+                      </button>
+                      <button
+                        onClick={increaseTextSize}
+                        disabled={textSize === 'large'}
+                        className="p-2 hover:bg-slate-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        aria-label="Increase text size"
+                        title="Larger text"
+                      >
+                        <Type className="w-5 h-5 text-slate-700" />
+                      </button>
+                    </div>
+                    <VersionSelector
+                      version={version}
+                      onChange={setVersion}
+                    />
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-3 mb-8">
@@ -277,21 +319,21 @@ export function ReadingPlan() {
                           {selectedPassage}
                         </h4>
                         <div className="max-w-3xl mx-auto">
-                          <div className="text-slate-700 leading-relaxed space-y-2">
+                          <div className={`text-slate-700 ${getTextSizeClass()}`}>
                             {passageText.split('\n').map((verse, idx) => {
                               const match = verse.match(/^(\d+)\s+(.+)$/);
                               if (match) {
                                 const [, number, text] = match;
                                 return (
-                                  <p key={idx} className="flex gap-3">
-                                    <span className="font-bold text-slate-900 min-w-[2rem] flex-shrink-0">
+                                  <span key={idx}>
+                                    <sup className="font-bold text-slate-900 mr-1">
                                       {number}
-                                    </span>
-                                    <span className="flex-1">{text}</span>
-                                  </p>
+                                    </sup>
+                                    {text}{' '}
+                                  </span>
                                 );
                               }
-                              return verse ? <p key={idx}>{verse}</p> : null;
+                              return verse ? <span key={idx}>{verse} </span> : null;
                             })}
                           </div>
                         </div>
