@@ -292,6 +292,8 @@ function parseReadingPlan() {
 
 export async function seedReadingPlan() {
   const entries = parseReadingPlan();
+  console.log(`Seeding ${entries.length} reading plan entries...`);
+  console.log('First 3 entries:', entries.slice(0, 3));
 
   const { error } = await supabase
     .from('reading_plan')

@@ -52,6 +52,7 @@ export function ReadingPlan() {
   async function loadReading(date: Date) {
     setLoading(true);
     const dateStr = date.toISOString().split('T')[0];
+    console.log('Loading reading for date:', dateStr);
 
     const { data, error } = await supabase
       .from('reading_plan')
@@ -62,6 +63,7 @@ export function ReadingPlan() {
     if (error) {
       console.error('Error loading reading:', error);
     } else {
+      console.log('Loaded reading data:', data);
       setReading(data);
     }
 
