@@ -105,6 +105,9 @@ async function fetchPassage(reference: string, version: BibleVersion): Promise<s
           continue;
         }
 
+        // Add chapter header for multi-chapter passages
+        formattedText += `CHAPTER ${ch}\n`;
+
         const verseNumbers = Object.keys(chapterData).sort((a, b) => Number(a) - Number(b));
         for (const verseNum of verseNumbers) {
           formattedText += `${verseNum} ${chapterData[verseNum]}\n`;

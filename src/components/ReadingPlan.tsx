@@ -321,9 +321,23 @@ export function ReadingPlan() {
                         <div className="max-w-3xl mx-auto">
                           <div className={`text-slate-700 ${getTextSizeClass()}`}>
                             {passageText.split('\n').map((verse, idx) => {
-                              const match = verse.match(/^(\d+)\s+(.+)$/);
-                              if (match) {
-                                const [, number, text] = match;
+                              // Check for chapter headers
+                              const chapterMatch = verse.match(/^CHAPTER (\d+)$/);
+                              if (chapterMatch) {
+                                const [, chapterNum] = chapterMatch;
+                                return (
+                                  <div key={idx} className="mt-6 mb-3 first:mt-0">
+                                    <h5 className="text-2xl font-bold text-slate-900">
+                                      Chapter {chapterNum}
+                                    </h5>
+                                  </div>
+                                );
+                              }
+
+                              // Check for verse lines
+                              const verseMatch = verse.match(/^(\d+)\s+(.+)$/);
+                              if (verseMatch) {
+                                const [, number, text] = verseMatch;
                                 return (
                                   <span key={idx}>
                                     <sup className="font-bold text-slate-900 mr-1">
