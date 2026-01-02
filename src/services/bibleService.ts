@@ -50,8 +50,12 @@ function parseReference(reference: string): { book: string; chapter: string; ver
   // Clean up the reference
   const cleaned = reference.trim();
 
-  // Match patterns like "Gen 1", "2 Tim 2", "Ecc 5", "John 3:16", "Gen 1:1-10"
-  const match = cleaned.match(/^([\d\s]*[A-Za-z]+)\s+(\d+)(?::(\d+(?:-\d+)?))?$/);
+  // Match patterns like:
+  // - "Gen 1" (single chapter)
+  // - "Ecc 6-7" (chapter range)
+  // - "John 3:16" (single verse)
+  // - "Gen 1:1-10" (verse range)
+  const match = cleaned.match(/^([\d\s]*[A-Za-z]+)\s+(\d+(?:-\d+)?)(?::(\d+(?:-\d+)?))?$/);
 
   if (!match) {
     console.error('Could not parse reference:', cleaned);
@@ -89,36 +93,55 @@ async function fetchPassage(reference: string, version: BibleVersion): Promise<s
       return `Book not found: ${book}`;
     }
 
-    // Check if chapter exists
-    if (!bibleData[book][chapter]) {
-      return `Chapter ${chapter} not found in ${book}`;
-    }
-
-    const chapterData = bibleData[book][chapter];
     let formattedText = '';
 
-    if (verses) {
-      // Specific verse or range
-      if (verses.includes('-')) {
-        const [start, end] = verses.split('-').map(Number);
-        for (let v = start; v <= end; v++) {
-          const verseText = chapterData[v.toString()];
-          if (verseText) {
-            formattedText += `${v} ${verseText}\n`;
-          }
+    // Handle chapter ranges (e.g., "6-7")
+    if (chapter.includes('-')) {
+      const [startChapter, endChapter] = chapter.split('-').map(Number);
+      for (let ch = startChapter; ch <= endChapter; ch++) {
+        const chapterData = bibleData[book][ch.toString()];
+        if (!chapterData) {
+          formattedText += `Chapter ${ch} not found in ${book}\n`;
+          continue;
         }
-      } else {
-        // Single verse
-        const verseText = chapterData[verses];
-        if (verseText) {
-          formattedText = `${verses} ${verseText}`;
+
+        const verseNumbers = Object.keys(chapterData).sort((a, b) => Number(a) - Number(b));
+        for (const verseNum of verseNumbers) {
+          formattedText += `${verseNum} ${chapterData[verseNum]}\n`;
         }
       }
     } else {
-      // Whole chapter
-      const verseNumbers = Object.keys(chapterData).sort((a, b) => Number(a) - Number(b));
-      for (const verseNum of verseNumbers) {
-        formattedText += `${verseNum} ${chapterData[verseNum]}\n`;
+      // Single chapter
+      // Check if chapter exists
+      if (!bibleData[book][chapter]) {
+        return `Chapter ${chapter} not found in ${book}`;
+      }
+
+      const chapterData = bibleData[book][chapter];
+
+      if (verses) {
+        // Specific verse or range
+        if (verses.includes('-')) {
+          const [start, end] = verses.split('-').map(Number);
+          for (let v = start; v <= end; v++) {
+            const verseText = chapterData[v.toString()];
+            if (verseText) {
+              formattedText += `${v} ${verseText}\n`;
+            }
+          }
+        } else {
+          // Single verse
+          const verseText = chapterData[verses];
+          if (verseText) {
+            formattedText = `${verses} ${verseText}`;
+          }
+        }
+      } else {
+        // Whole chapter
+        const verseNumbers = Object.keys(chapterData).sort((a, b) => Number(a) - Number(b));
+        for (const verseNum of verseNumbers) {
+          formattedText += `${verseNum} ${chapterData[verseNum]}\n`;
+        }
       }
     }
 

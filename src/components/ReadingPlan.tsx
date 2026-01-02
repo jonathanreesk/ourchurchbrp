@@ -345,7 +345,11 @@ export function ReadingPlan() {
             ) : (
               <div className="text-center py-12">
                 <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-600">No reading scheduled for this date</p>
+                <p className="text-slate-600">
+                  {currentDate.getDay() === 0 || currentDate.getDay() === 6
+                    ? 'No reading on weekends - Enjoy your rest day!'
+                    : 'No reading scheduled for this date'}
+                </p>
               </div>
             )}
           </div>
