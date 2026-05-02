@@ -19,3 +19,11 @@ export interface BiblePassage {
   reference: string;
   text: string;
 }
+
+export interface Comment {
+  id: string;
+  reading_date: string;
+  author_name: string;
+  content: string;
+  created_at: string;
+}

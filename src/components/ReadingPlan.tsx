@@ -1,13 +1,44 @@
-import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, BookOpen, Calendar, Check, CheckCircle2, Type } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight, BookOpen, Calendar, CheckCircle2, Type, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ReadingPlan as ReadingPlanType, BibleVersion } from '../types';
 import { fetchReadingPassages } from '../services/bibleService';
 import { VersionSelector } from './VersionSelector';
+import { Comments } from './Comments';
 
 function getCSTDate() {
-  // Use local timezone to avoid date parsing issues
   return new Date();
+}
+
+// Web Audio chime played when a new comment arrives and the section isn't in view
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    [[523.25, 0], [659.25, 0.22]].forEach(([freq, delay]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+      gain.gain.linearRampToValueAtTime(0.28, ctx.currentTime + delay + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.9);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.9);
+    });
+  } catch {
+    // Audio context not available
+  }
+}
+
+function showBrowserNotification() {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  new Notification("New comment on today's reading", {
+    body: 'Someone shared a thought — tap to view.',
+    icon: '/favicon.ico',
+    tag: 'new-comment',
+  });
 }
 
 export function ReadingPlan() {
@@ -21,6 +52,16 @@ export function ReadingPlan() {
   const [completedPassages, setCompletedPassages] = useState<Set<string>>(new Set());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [textSize, setTextSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [unreadComments, setUnreadComments] = useState(0);
+  const [communityVisible, setCommunityVisible] = useState(false);
+  const communityRef = useRef<HTMLDivElement>(null);
+
+  // Request browser notification permission once
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
 
   useEffect(() => {
     loadReading(currentDate);
@@ -31,28 +72,26 @@ export function ReadingPlan() {
       loadCompletedPassages();
       setSelectedPassage(null);
       setPassageText('');
+      setUnreadComments(0);
+      setCommunityVisible(false);
     }
   }, [reading]);
 
   useEffect(() => {
-    // Re-fetch passage when version changes
     if (selectedPassage) {
-      const refetchPassage = async () => {
+      const refetch = async () => {
         setLoadingPassage(true);
         const results = await fetchReadingPassages(selectedPassage, version);
-        if (results.length > 0) {
-          setPassageText(results[0].text);
-        }
+        if (results.length > 0) setPassageText(results[0].text);
         setLoadingPassage(false);
       };
-      refetchPassage();
+      refetch();
     }
   }, [version]);
 
   async function loadReading(date: Date) {
     setLoading(true);
     const dateStr = date.toISOString().split('T')[0];
-    console.log('Loading reading for date:', dateStr);
 
     const { data, error } = await supabase
       .from('reading_plan')
@@ -60,28 +99,20 @@ export function ReadingPlan() {
       .eq('date', dateStr)
       .maybeSingle();
 
-    if (error) {
-      console.error('Error loading reading:', error);
-    } else {
-      console.log('Loaded reading data:', data);
-      setReading(data);
-    }
+    if (error) console.error('Error loading reading:', error);
+    else setReading(data);
 
     setLoading(false);
   }
 
   function loadCompletedPassages() {
     if (!reading) return;
-
-    // Load completed passages from localStorage
     const key = `completed_${reading.date}`;
     const stored = localStorage.getItem(key);
     if (stored) {
       try {
-        const passages = JSON.parse(stored);
-        setCompletedPassages(new Set(passages));
-      } catch (error) {
-        console.error('Error loading completed passages from localStorage:', error);
+        setCompletedPassages(new Set(JSON.parse(stored)));
+      } catch {
         setCompletedPassages(new Set());
       }
     } else {
@@ -91,26 +122,16 @@ export function ReadingPlan() {
 
   async function handlePassageClick(passage: string) {
     if (!reading) return;
-
-    // Load the passage text
     setSelectedPassage(passage);
     setLoadingPassage(true);
-
     const results = await fetchReadingPassages(passage, version);
-    if (results.length > 0) {
-      setPassageText(results[0].text);
-    }
-
+    if (results.length > 0) setPassageText(results[0].text);
     setLoadingPassage(false);
 
-    // Mark as completed in localStorage
     if (!completedPassages.has(passage)) {
       const updated = new Set([...completedPassages, passage]);
       setCompletedPassages(updated);
-
-      // Save to localStorage
-      const key = `completed_${reading.date}`;
-      localStorage.setItem(key, JSON.stringify([...updated]));
+      localStorage.setItem(`completed_${reading.date}`, JSON.stringify([...updated]));
     }
   }
 
@@ -125,9 +146,21 @@ export function ReadingPlan() {
   }
 
   function handleDateSelect(dateString: string) {
-    const selectedDate = new Date(dateString + 'T00:00:00');
-    setCurrentDate(selectedDate);
+    setCurrentDate(new Date(dateString + 'T00:00:00'));
     setShowDatePicker(false);
+  }
+
+  function handleOpenCommunity() {
+    setCommunityVisible(true);
+    setUnreadComments(0);
+    setTimeout(() => communityRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+  }
+
+  function handleNewCommentArrived() {
+    if (!communityVisible) {
+      playChime();
+      showBrowserNotification();
+    }
   }
 
   function increaseTextSize() {
@@ -143,18 +176,15 @@ export function ReadingPlan() {
   const getTextSizeClass = () => {
     switch (textSize) {
       case 'small': return 'text-base leading-relaxed';
-      case 'medium': return 'text-lg leading-relaxed';
       case 'large': return 'text-xl leading-relaxed';
       default: return 'text-lg leading-relaxed';
     }
   };
 
-  const getDayOfWeek = (date: Date) => {
-    return date.toLocaleDateString('en-US', { weekday: 'long' });
-  };
+  const getDayOfWeek = (date: Date) =>
+    date.toLocaleDateString('en-US', { weekday: 'long' });
 
   const expandBookName = (reference: string): string => {
-    // Book name mapping for abbreviations
     const bookMappings: Record<string, string> = {
       'Gen': 'Genesis', 'Ex': 'Exodus', 'Exod': 'Exodus', 'Lev': 'Leviticus',
       'Num': 'Numbers', 'Deut': 'Deuteronomy', 'Josh': 'Joshua', 'Judg': 'Judges',
@@ -172,31 +202,23 @@ export function ReadingPlan() {
       '1 Tim': '1 Timothy', '2 Tim': '2 Timothy', 'Tit': 'Titus', 'Phlm': 'Philemon',
       'Heb': 'Hebrews', 'Jas': 'James', 'Jam': 'James', '1 Pet': '1 Peter',
       '2 Pet': '2 Peter', '1 Jn': '1 John', '2 Jn': '2 John', '3 Jn': '3 John',
-      'Rev': 'Revelation'
+      'Rev': 'Revelation',
     };
-
-    // Try to match the book abbreviation at the start of the reference
     for (const [abbrev, fullName] of Object.entries(bookMappings)) {
-      if (reference.startsWith(abbrev + ' ')) {
-        return reference.replace(abbrev, fullName);
-      }
+      if (reference.startsWith(abbrev + ' ')) return reference.replace(abbrev, fullName);
     }
-
     return reference;
   };
 
   const formatDate = (date: Date) => {
     const month = date.toLocaleDateString('en-US', { month: 'long' });
     const day = date.getDate();
-
-    // Add ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
-    const getOrdinalSuffix = (n: number) => {
-      const s = ["th", "st", "nd", "rd"];
+    const getOrdinal = (n: number) => {
+      const s = ['th', 'st', 'nd', 'rd'];
       const v = n % 100;
       return n + (s[(v - 20) % 10] || s[v] || s[0]);
     };
-
-    return `${month} ${getOrdinalSuffix(day)}`;
+    return `${month} ${getOrdinal(day)}`;
   };
 
   const isToday = currentDate.toDateString() === getCSTDate().toDateString();
@@ -222,6 +244,7 @@ export function ReadingPlan() {
           <p className="text-slate-600">2026 Reading Plan</p>
         </header>
 
+        {/* Main reading card */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden mb-4 sm:mb-6">
           <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-3 sm:px-6 py-6 sm:py-8 text-white">
             <div className="flex items-center justify-between mb-4">
@@ -289,9 +312,7 @@ export function ReadingPlan() {
             {reading ? (
               <>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
-                  <h3 className="text-lg font-semibold text-slate-900">
-                    Today's Reading
-                  </h3>
+                  <h3 className="text-lg font-semibold text-slate-900">Today's Reading</h3>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1 border border-slate-300 rounded-lg p-1">
                       <button
@@ -313,23 +334,19 @@ export function ReadingPlan() {
                         <Type className="w-5 h-5 text-slate-700" />
                       </button>
                     </div>
-                    <VersionSelector
-                      version={version}
-                      onChange={setVersion}
-                    />
+                    <VersionSelector version={version} onChange={setVersion} />
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-3 mb-8">
                   {reading.reading.split(';').map((passage, index) => {
-                    const trimmedPassage = passage.trim();
-                    const isCompleted = completedPassages.has(trimmedPassage);
-                    const isSelected = selectedPassage === trimmedPassage;
-
+                    const trimmed = passage.trim();
+                    const isCompleted = completedPassages.has(trimmed);
+                    const isSelected = selectedPassage === trimmed;
                     return (
                       <button
                         key={index}
-                        onClick={() => handlePassageClick(trimmedPassage)}
+                        onClick={() => handlePassageClick(trimmed)}
                         className={`text-left px-5 py-4 rounded-xl border-2 transition-all flex items-center gap-3 group ${
                           isSelected
                             ? 'border-blue-500 bg-blue-50 shadow-lg ring-2 ring-blue-200'
@@ -341,11 +358,9 @@ export function ReadingPlan() {
                         <span className={`text-lg font-semibold whitespace-nowrap ${
                           isSelected ? 'text-blue-900' : isCompleted ? 'text-green-900' : 'text-slate-700 group-hover:text-slate-900'
                         }`}>
-                          {trimmedPassage}
+                          {trimmed}
                         </span>
-                        {isCompleted && (
-                          <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
-                        )}
+                        {isCompleted && <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />}
                       </button>
                     );
                   })}
@@ -355,9 +370,9 @@ export function ReadingPlan() {
                   <div className="border-t border-slate-200 pt-6">
                     {loadingPassage ? (
                       <div className="animate-pulse space-y-3">
-                        <div className="h-4 bg-slate-100 rounded w-full"></div>
-                        <div className="h-4 bg-slate-100 rounded w-full"></div>
-                        <div className="h-4 bg-slate-100 rounded w-5/6"></div>
+                        <div className="h-4 bg-slate-100 rounded w-full" />
+                        <div className="h-4 bg-slate-100 rounded w-full" />
+                        <div className="h-4 bg-slate-100 rounded w-5/6" />
                       </div>
                     ) : (
                       <div className="bg-slate-50 rounded-xl p-4 sm:p-6">
@@ -367,28 +382,21 @@ export function ReadingPlan() {
                         <div className="mx-auto">
                           <div className={`text-slate-700 ${getTextSizeClass()}`}>
                             {passageText.split('\n').map((verse, idx) => {
-                              // Check for chapter headers
                               const chapterMatch = verse.match(/^CHAPTER (\d+)$/);
                               if (chapterMatch) {
                                 const [, chapterNum] = chapterMatch;
                                 return (
                                   <div key={idx} className="mt-6 mb-3 first:mt-0">
-                                    <h5 className="text-2xl font-bold text-slate-900">
-                                      Chapter {chapterNum}
-                                    </h5>
+                                    <h5 className="text-2xl font-bold text-slate-900">Chapter {chapterNum}</h5>
                                   </div>
                                 );
                               }
-
-                              // Check for verse lines
                               const verseMatch = verse.match(/^(\d+)\s+(.+)$/);
                               if (verseMatch) {
                                 const [, number, text] = verseMatch;
                                 return (
                                   <span key={idx}>
-                                    <sup className="font-bold text-slate-900 mr-1">
-                                      {number}
-                                    </sup>
+                                    <sup className="font-bold text-slate-900 mr-1">{number}</sup>
                                     {text}{' '}
                                   </span>
                                 );
@@ -407,7 +415,7 @@ export function ReadingPlan() {
                 <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                 <p className="text-slate-600">
                   {currentDate.getDay() === 0 || currentDate.getDay() === 6
-                    ? 'No reading on weekends - Enjoy your rest day!'
+                    ? 'No reading on weekends — enjoy your rest day!'
                     : 'No reading scheduled for this date'}
                 </p>
               </div>
@@ -415,14 +423,55 @@ export function ReadingPlan() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden p-3 sm:p-8">
+        {/* Guide card (renamed from Resources) */}
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden p-3 sm:p-8 mb-4 sm:mb-6">
           <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3 sm:mb-4 flex items-center gap-2">
             <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-slate-700" />
-            Helpful Resources
+            Guide
           </h3>
           <p className="text-slate-600 text-center py-6 sm:py-8">
-            Resource videos coming soon...
+            Guide videos and resources coming soon…
           </p>
+        </div>
+
+        {/* Community / Comments card */}
+        <div ref={communityRef} className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden p-3 sm:p-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-slate-700" />
+              Community
+              {unreadComments > 0 && (
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold leading-none">
+                  {unreadComments > 9 ? '9+' : unreadComments}
+                </span>
+              )}
+            </h3>
+            {!communityVisible && (
+              <button
+                onClick={handleOpenCommunity}
+                className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                View
+              </button>
+            )}
+          </div>
+
+          {communityVisible && reading && (
+            <Comments
+              date={reading.date}
+              isActive={communityVisible}
+              onUnreadCountChange={setUnreadComments}
+              onNewCommentArrived={handleNewCommentArrived}
+            />
+          )}
+
+          {!communityVisible && (
+            <p className="text-slate-500 text-sm text-center py-4">
+              {unreadComments > 0
+                ? `${unreadComments} new comment${unreadComments === 1 ? '' : 's'} — tap View to read`
+                : 'Share a thought on today\'s reading'}
+            </p>
+          )}
         </div>
       </div>
     </div>
