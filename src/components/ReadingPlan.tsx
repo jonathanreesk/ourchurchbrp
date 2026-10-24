@@ -407,7 +407,7 @@ export function ReadingPlan() {
                 <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                 <p className="text-slate-600">
                   {currentDate.getDay() === 0 || currentDate.getDay() === 6
-                    ? 'No reading on weekends - Enjoy your rest day!'
+                    ? "Weekend: Catch-up and time with the Lord. If you're behind, catch up on this week's readings. If you're on track, pick a passage and spend time with the Lord in it."
                     : 'No reading scheduled for this date'}
                 </p>
               </div>
